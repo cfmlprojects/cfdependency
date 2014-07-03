@@ -1,0 +1,48 @@
+<project name="distro.build" default="build" basedir="./"
+	xmlns:antcontrib="antlib:net.sf.antcontrib">
+
+	<loadproperties srcfile="build.properties" />
+	<import file="${cfdistro.build.file}" />
+
+	<target name="build" depends="cfdistro.build">
+		<dependency groupId="org.mxunit" artifactId="core"
+			version="${mxunit.version}" mapping="/mxunit" />
+		<!-- add mappings -->
+		<mapping physical="${basedir}/../tests" virtual="/tests" />
+	</target>
+
+	<target name="build.jar">
+		<property name="mvn.repo.dest" value="local" />
+        <property name="mvn.repo.dest" value="remote" />
+        <property name="mvn.repo.id" value="mvn.repo.${mvn.repo.dest}" />
+        <property name="maven.repo.local" location="${cfdistro.basedir}/artifacts" />
+        <mvn-repo id="mvn.repo.local" url="file://${maven.repo.local}/" />
+        <property name="mvn.type" value="release" />
+
+		<delete dir="${temp.dir}/lib" />
+		<delete dir="${temp.dir}/bin" />
+		<delete file="${dist.dir}/aether-bundle.jar" />
+		<mvn-get-deps todir="${temp.dir}/lib" pomfile="aether.pom" />
+		<unzip dest="${temp.dir}/bin">
+			<fileset dir="${temp.dir}/lib" includes="*.jar"/>
+		</unzip>
+		<jar destfile="${dist.dir}/aether-bundle.jar" filesetmanifest="mergewithoutmain" level="9">
+			<manifest>
+				<attribute name="Main-Class" value="railocli.CLIMain" />
+			</manifest>
+			<fileset dir="${temp.dir}/bin"/>
+		</jar>
+		<pom-and-deploy pomid="cfml.pom" packaging="jar" artifact="${dist.dir}/aether-bundle.jar"
+		         groupId="org.cfmlprojects" artifactId="cfdependency" version="1.0.0" name="cfdependency"/>
+
+		<zip file="${dist.dir}/cfaether.zip">
+			<fileset dir="${src.dir}/cfdependency/aether" />
+		</zip>
+		<pom-and-deploy pomid="aether.pom" packaging="zip" artifact="${dist.dir}/cfaether.zip"
+		         groupId="org.cfmlprojects" artifactId="cfaether" version="1.0.0" name="cfaether"/>
+
+	</target>
+
+
+
+</project>

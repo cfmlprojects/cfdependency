@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mappings>
+<!-- 
+  <mapping physical="@src.dir@/../tests" virtual="/tests"/>
+ -->
+  <mapping physical="@src.dir@/cfdependency" virtual="/cfdependency"/>
+<mapping physical="./../tests" scmurl="" virtual="/tests"/>
+<mapping physical="@ext.mappings.dir@/org.mxunit/core/2.1.3" scmurl="" virtual="/mxunit"/>
+</mappings>
