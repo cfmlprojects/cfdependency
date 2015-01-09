@@ -1,5 +1,10 @@
 component output="false" persistent="false" {
 
+	/**
+	 * constructor
+	 * @localPath.hint location of local repository
+	 * @repositories.hint comma-separated list of repositories or "default" for defaults
+	 **/
 	function init(localPath=getDirectoryFromPath(getTemplatePath()) & "/repo", repositories="default", javaloader) {
 		localRepositoryPath = localPath;
    		cl = javaloader;
@@ -8,6 +13,8 @@ component output="false" persistent="false" {
 		//jThread.currentThread().setContextClassLoader(cl.GETLOADER().getURLClassLoader());
 		system = cl.create("java.lang.System");
 		jFile = cl.create("java.io.File");
+		jArrays = cl.create("java.util.Arrays");
+		jArrayList = cl.create("java.util.ArrayList");
 
 		//jMavenRepositorySystemSession = cl.create("org.apache.maven.repository.internal.MavenRepositorySystemSession");
 
@@ -52,6 +59,7 @@ component output="false" persistent="false" {
 		jArtifactDescriptorReader = cl.create("org.eclipse.aether.impl.ArtifactDescriptorReader");
 		jCollectRequest = cl.create("org.eclipse.aether.collection.CollectRequest");
 		jDependency = cl.create("org.eclipse.aether.graph.Dependency");
+		jExclusion = cl.create("org.eclipse.aether.graph.Exclusion");
 		jDependencyRequest = cl.create("org.eclipse.aether.resolution.DependencyRequest");
 		jDependencyFilterUtils = cl.create("org.eclipse.aether.util.filter.DependencyFilterUtils");
 		jJavaScopes = cl.create("org.eclipse.aether.util.artifact.JavaScopes");
@@ -63,12 +71,19 @@ component output="false" persistent="false" {
 		jDefaultRepositorySystemSession.init();
 		//_repositorySystem = jMavenRepositorySystemSession.init();
 		initDefaults();
-		if(repositories=="default") {
+		if(isSimpleValue(repositories) && repositories == "default") {
 			addDefaultRepositories();
+		} else {
+			for(var repo in repositories){
+				addRemoteRepository(repo.name,repo.url,repo.type);
+			}
 		}
 		return this;
 	}
 
+	/**
+	 * initialize defaults
+	 **/
     private void function initDefaults() {
 		variables.repositories = [];
     	variables.locator = jMavenRepositorySystemUtils.newServiceLocator();
@@ -154,9 +169,49 @@ component output="false" persistent="false" {
     	return msession;
     }
 
+    public function artifact( required String groupId, String artifactId, String classifier, String extension, String version, String type ) {
+ 		if(find(":",groupId)) {
+	 		var art = jDefaultArtifact.init(groupId);
+ 		} else if(find(":",artifactId)) {
+	 		var art = jDefaultArtifact.init(artifactId);
+ 		} else {
+	 		var art = jDefaultArtifact.init(groupId,artifactId,
+	 			isNull(classifier) ? javacast("null","") : classifier,
+	 			isNull(extension) ? javacast("null","") : extension,
+	 			isNull(version) ? javacast("null","") : version,
+	 			isNull(type) ? javacast("null","") : type
+	 		);
+
+ 		}
+ 		return art;
+   	}
+
+    public function exclusion( required String groupId, String artifactId, String classifier="*", String extension="*") {
+ 		if(find(":",groupId)) {
+	 		artifactId = listLast(groupId,":");
+	 		groupId = listFirst(groupId,":");
+ 		}
+  		var ex = jExclusion.init(groupId, artifactId,
+ 			isNull(classifier) ? javacast("null","") : classifier,
+ 			isNull(extension) ? javacast("null","") : extension
+ 		);
+ 		return ex;
+   	}
+
+    public function dependency(  String artifactId, String scope, Boolean optional=false, exclusions=[] ) {
+        var art = artifact(artifactId);
+        var dep = jDependency.init(
+	 		art,
+	 		isNull(scope) ? "" : scope,
+ 		 	optional,
+ 		 	isNull(exclusions) || !exclusions.size() ? javacast("null","") : exclusions
+ 		);
+ 		return dep;
+   	}
+
     public function resolveArtifact(artifactId) {
         var msession = getSession();
-        var artifact = jDefaultArtifact.init( "org.sonatype.aether:aether-util:1.9" );
+        var artifact = jDefaultArtifact.init( artifactId );
         var artifactRequest = jArtifactRequest.init();
         artifactRequest.setArtifact( artifact );
         artifactRequest.setRepositories( getRepositories() );
@@ -173,7 +228,7 @@ component output="false" persistent="false" {
         return artifact & " resolved to  " & artifact.getFile();
     }
 
-    public function install(artifactId,artifactFile,pomFile) {
+    public function install(artifactId, artifactFile, pomFile) {
         var msession = getSession();
         var artifact = jDefaultArtifact.init( artifactId );
         var aFile = jFile.init( artifactFile );
@@ -272,19 +327,6 @@ component output="false" persistent="false" {
              return artifact & " resolved to  " & artifact.getFile();
     }
 
-    public function dependency(artifactId) {
-        var msession = getSession();
-        var artifact = jDefaultArtifact.init( "org.sonatype.aether:aether-util:1.9" );
-		var rangeRequest = jVersionRangeRequest.init();
-        rangeRequest.setArtifact( artifact );
-        rangeRequest.setRepositories( getRepositories() );
-        var rangeResult = getSystem().resolveVersionRange( msession, rangeRequest );
-        var newestVersion = rangeResult.getHighestVersion();
-        var message = "Newest version " & newestVersion & " from repository "
-            & rangeResult.getRepository( newestVersion );
-        return message;
-    }
-
     public function resolved(artifactId) {
         var msession = getSession();
         var artifact = jDefaultArtifact.init( artifactId );
@@ -322,7 +364,7 @@ component output="false" persistent="false" {
 
     public function dependencies(artifactId,scopes="compile") {
         var msession = getSession();
-        var artifact = jDefaultArtifact.init( "org.sonatype.aether:aether-util:1.9" );
+        var artifact = jDefaultArtifact.init( artifactId );
         var collectRequest = jCollectRequest.init();
         var filter = jDependencyFilterUtils.classpathFilter( [scopes] );
         var dependency = jDependency.init( artifact, "" );
@@ -354,15 +396,25 @@ component output="false" persistent="false" {
         return artifact & " resolved to  " & artifact.getFile();
     }
 
-	public function materialize(artifactId, directory, Boolean unzip = false) {
+	public function materialize(deps, directory, Boolean unzip = false, exclusions="") {
         var msession = getSession();
-        var artifact = jDefaultArtifact.init( artifactId );
         var filter = jDependencyFilterUtils.classpathFilter( [jJavaScopes.COMPILE] );
         var collectRequest = jCollectRequest.init();
-        collectRequest.setRoot( jDependency.init( artifact, jJavaScopes.COMPILE ) );
+        if(isSimpleValue(deps)) {
+        	deps = [dependency(deps)];
+        }
+        if(deps.size() == 1) {
+	        collectRequest.setRoot( deps[1] );
+        } else {
+	        collectRequest.setDependencies( deps );
+        }
         collectRequest.setRepositories( getRepositories() );
-        var dependencyRequest = jDependencyRequest.init( collectRequest, filter );
-        var resolved = getSystem().resolveDependencies( msession, dependencyRequest );
+        var dependencyRequest = jDependencyRequest.init( collectRequest, javacast("null","") );
+        try{
+	        var resolved = getSystem().resolveDependencies( msession, dependencyRequest );
+        } catch ("org.eclipse.aether.resolution.DependencyResolutionException" e) {
+        	throw(type="DependencyResolutionException", message=e.message, detail="could not load #deps.toString()# from #getRepositories().toString()#");
+        }
 		if(!directoryExists(directory)) {
 			directoryCreate(directory);
 		}
@@ -399,20 +451,43 @@ component output="false" persistent="false" {
         return deps;
     }
 
-    public function collectDependencies(artifactId,scopes="") {
+    public function managedDependencies(required artifactId, artifactIds="", exclusions="") {
         var msession = getSession();
-        var artifact = jDefaultArtifact.init( artifactId );
-        var collectRequest = jCollectRequest.init();
-        collectRequest.setRoot( jDependency.init( artifact, "") );
-        collectRequest.setRepositories( getRepositories() );
-        var dependencies = getSystem().collectDependencies( msession, collectRequest );
-        var graph = cl.create("org.eclipse.aether.util.graph.visitor.PreorderNodeListGenerator").init();
-        dependencies.getRoot().accept( graph );
+		var descriptorRequest = jArtifactDescriptorRequest.init();
+        descriptorRequest.setArtifact( artifact(artifactId) ).setRepositories( getRepositories() );
+        var descriptorResult = getSystem().readArtifactDescriptor( msession, descriptorRequest );
+     	var globalExclusions = jArrayList.init();
+     	listToArray(exclusions).each(function(ex) {
+     		globalExclusions.add(exclusion(ex));
+     	});
         var deps = [];
-        for ( var dependency in graph.getDependencies(true) )
+        for ( var dependency in descriptorResult.getManagedDependencies() ) {
+        	var exclude = false;
+	     	listToArray(exclusions).each(function(ex) {
+        		if(lcase(dependency.getArtifact().toString()).startsWith( lcase(ex)) ) {
+	     			exclude = true;
+        		}
+	     	});
+	     	if(exclude) { continue; };
+        	for(var id in listToArray(artifactIds)) {
+        		if(lcase(dependency.getArtifact().toString()).startsWith( lcase(id)) ) {
+        			var excludes = jArrayList.init(dependency.getExclusions());
+        			excludes.addAll(globalExclusions);
+		            dependency = dependency.setExclusions(excludes);
+		            arrayAppend(deps,dependency);
+        		}
+        	}
+        }
+        return jArrays.asList(deps);
+    }
+
+    public function dependencyStruct(dependencies) {
+        var deps = [];
+        for ( var dependency in dependencies )
         {
         	var dep = {
             	artifactId:dependency.getArtifact().toString(),
+            	exclusions:dependency.getExclusions(),
             	artifact:dependency.getArtifact(),
             	optional:dependency.isOptional(),
             	resolved:resolved(dependency.getArtifact().toString()),
@@ -420,6 +495,19 @@ component output="false" persistent="false" {
 			};
             arrayAppend(deps,dep);
         }
+        return deps;
+    }
+
+    public function collectDependencies(artifactId,scopes="") {
+        var msession = getSession();
+        var artifact = jDefaultArtifact.init( artifactId );
+        var collectRequest = jCollectRequest.init(jDependency.init( artifact, ""), getRepositories());
+        var dependencies = getSystem().collectDependencies( msession, collectRequest );
+        var graph = cl.create("org.eclipse.aether.util.graph.visitor.PreorderNodeListGenerator").init();
+request.debug(dependencies.getExceptions());
+request.debug(dependencies.getRoot().getChildren());
+        dependencies.getRoot().accept( graph );
+        var deps = dependencyStruct(graph.getDependencies(true) );
         return deps;
     }
 
@@ -443,14 +531,14 @@ component output="false" persistent="false" {
         return settings;
     }
 
-    public function addRemoteRepository(name,type="default",repourl){
+    public function addRemoteRepository(name, repourl, type="default"){
         var repo = jRemoteRepository.init( name, type, repourl ).build();
     	arrayAppend(variables.repositories,repo);
     }
 
     private function addDefaultRepositories(){
-    	addRemoteRepository( "central", "default", "http://repo1.maven.org/maven2/" );
-    	addRemoteRepository( "cfmlprojects", "default", "http://cfmlprojects.org/artifacts/" );
+    	addRemoteRepository( "central", "http://repo1.maven.org/maven2/" );
+    	addRemoteRepository( "cfmlprojects", "http://cfmlprojects.org/artifacts/" );
     }
 
     private function getDefaultLocalRepoDir(){

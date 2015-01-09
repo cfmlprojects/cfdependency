@@ -13,8 +13,9 @@ component extends="mxunit.framework.TestCase" {
 		datapath = "#getDirectoryFromPath(getMetadata(this).path)#../data";
 		workpath = "#datapath#/work";
 		cfdistro = "/home/valliant/cfdistro/artifacts";
-		//manager = new cfdependency.Manager(workpath&"/repo");
-		manager = new cfdependency.Manager(cfdistro);
+		manager = new cfdependency.Manager(workpath&"/repo");
+		manager.addRemoteRepository( "jboss", "http://repository.jboss.org/nexus/content/repositories/releases" );
+		//manager = new cfdependency.Manager(cfdistro);
  	}
 
 	public void function tearDown()  {
@@ -25,6 +26,7 @@ component extends="mxunit.framework.TestCase" {
 //		var result = manager.resolve("org.getrailo:railo:4.2.1.000");
 //		var result = manager.resolve("org.apache.maven:maven-aether-provider:3.1.0");
 		var result = manager.resolve("cfml:javatools:zip:1.0.0");
+		assertTrue(find("cfml:javatools:pom:1.0.0 resolved to",result));
 		debug(result);
 	}
 
@@ -78,23 +80,47 @@ component extends="mxunit.framework.TestCase" {
 
 	function testMaterialize()  {
 		var payload = "this is so awesome!";
-		var result = manager.materialize("org.sonatype.aether:aether-util:1.9", workpath & "/libsman");
+//		var result = manager.materialize("org.sonatype.aether:aether-util:1.9", workpath & "/libsman");
+		var modeshapeVersion = "4.0.0.Beta1";
+		result = manager.materialize(deps="org.modeshape.bom:modeshape-bom-embedded:pom:#modeshapeVersion#", directory = workpath & "/libsman");
+
 		debug(result);
 		assertEquals(payload,result);
 	}
 
 	function testDirectDependency()  {
 		var payload = "this is so awesome!";
-		var result = manager.directDependencies(artifactId="org.sonatype.aether:aether-util:1.9");
+		//var result = manager.directDependencies(artifactId="org.sonatype.aether:aether-util:1.9");
+		var result = manager.directDependencies("org.modeshape.bom:modeshape-bom-embedded:pom:4.0.0.Beta1");
+		debug(result);
+		assertEquals(payload,result);
+	}
+
+	function testManagedDependency()  {
+		var payload = "this is so awesome!";
+		//var result = manager.directDependencies(artifactId="org.sonatype.aether:aether-util:1.9");
+		var result = manager.managedDependencies("org.modeshape.bom:modeshape-bom-embedded:pom:4.0.0.Beta1");
+		debug(result);
+		assertEquals(payload,result);
+	}
+
+	function testMaterializeManagedDependency()  {
+		var payload = "this is so awesome!";
+		//var result = manager.directDependencies(artifactId="org.sonatype.aether:aether-util:1.9");
+		var deps = manager.managedDependencies("org.modeshape.bom:modeshape-bom-embedded:pom:4.0.0.Beta1","org.modeshape:modeshape-jcr-api,org.modeshape:modeshape-jcr","org.modeshape:modeshape-jcr-tck");
+		var result = manager.materialize(deps=deps, directory = workpath & "/libsman");
 		debug(result);
 		assertEquals(payload,result);
 	}
 
 	function testCollectDependency()  {
 		var payload = "this is so awesome!";
-		var result = manager.collect(artifactId="org.apache.maven:maven-aether-provider:3.1.0");
+		//var result = manager.collect(artifactId="org.apache.maven:maven-aether-provider:3.1.0");
+		var modeshapeVersion = "4.0.0.Beta1";
+		var result = manager.collect(artifactId="org.modeshape.bom:modeshape-bom-embedded:pom:#modeshapeVersion#", directory = workpath & "/libsman")
+
 		debug(result);
-		assertEquals(payload,result);
+		assertTrue(arrayLen(result) > 5);
 	}
 
 	function testDependencies()  {

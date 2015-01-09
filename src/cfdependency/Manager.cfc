@@ -14,8 +14,8 @@ component {
 		rawMaterialize("org.cfmlprojects:cfaether:zip:1.0.0","#thisdir#/aether",true);
 		rawMaterialize("org.cfmlprojects:cfdependency:jar:1.0.0","#thisdir#/aether/lib");
 		rawMaterialize("cfml:javatools:zip:1.0.0","#thisdir#/javatools",true);
-		javaloader = new javatools.LibraryLoader(thisdir & "/aether/lib/")
-		aether = new aether.Aether(localPath=localPath, javaloader=javaloader);
+		javaloader = new javatools.LibraryLoader(pathlist=thisdir & "/aether/lib/", id="aether-classloader")
+		aether = new aether.Aether(localPath=localPath, javaloader=javaloader, repositories=repositories);
 	}
 /*
  * AETHER
@@ -44,6 +44,10 @@ component {
 		return aether.callMethod("directDependencies",arguments);
    	}
 
+    public function managedDependencies(artifactId,artifactIds,exclusions) {
+		return aether.callMethod("managedDependencies",arguments);
+   	}
+
     public function repositories() {
 		return aether.callMethod("repositories",arguments);
    	}
@@ -62,8 +66,8 @@ component {
 
 	public function rawMaterialize(artifact, directory, Boolean unzip = false) {
 		if(!directoryExists(directory)) {
+			var files = rawResolve(artifact);
 			try {
-				var files = rawResolve(artifact);
 				directoryCreate(directory);
 				for(var file in files) {
 					if(unzip) {
@@ -111,6 +115,8 @@ component {
     public function addRemoteRepository(required name,required repourl, type="default"){
         var repo = { name : name, type: type, repourl: repourl };
     	arrayAppend(variables.remotes,repo);
+    	if(!isNull(aether))
+        	aether.addRemoteRepository(name,repourl,type);
     }
 
     private function addDefaultRepositories(){
