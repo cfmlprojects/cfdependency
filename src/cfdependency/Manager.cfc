@@ -1,6 +1,6 @@
 component {
 
-	function init(localPath=getDirectoryFromPath(getTemplatePath()) & "/repo", repositories="default") {
+	function init(localPath=getDirectoryFromPath(getMetadata(this).path) & "/repo", repositories="default") {
 		localRepositoryPath = localPath;
 		remotes = [];
 		thisdir = getDirectoryFromPath(getMetadata(this).path);
