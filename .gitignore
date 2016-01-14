@@ -5,6 +5,8 @@
 /build/cache.properties
 /build/extensionbase
 /build/requires.txt
+/build/jmimemagic.log
+/tests/data/work
 /src/cfdependency/aether/lib/
 /src/cfdependency/javatools/
 /tests/*/work/*

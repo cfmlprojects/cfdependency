@@ -6,6 +6,7 @@ component extends="mxunit.framework.TestCase" {
 		if(directoryExists(workpath))
 			directoryDelete(workpath,true);
 		directoryCreate(workpath);
+		directoryCreate(workpath & "/pom");
  	}
 
 
@@ -60,22 +61,9 @@ component extends="mxunit.framework.TestCase" {
 
 	function testGeneratePom()  {
 		var payload = "this is so awesome!";
-		var result = manager.pom();
+		var result = manager.pom("org.test.cfaether:cfaether:1.0.0",workpath & "/pom/simple.pom");
+		assertEquals(fileRead(workpath & "/pom/simple.pom"),fileRead(datapath & "/pom/simple.pom"))
 		debug(result);
-	}
-
-	function testDependency()  {
-		var payload = "this is so awesome!";
-		var result = manager.dependency();
-		debug(result);
-		assertEquals(payload,result);
-	}
-
-	function testTransDependency()  {
-		var payload = "this is so awesome!";
-		var result = manager.transdependency(artifactId="org.sonatype.aether:aether-util:1.9");
-		debug(result);
-		assertEquals(payload,result);
 	}
 
 	function testMaterialize()  {
@@ -90,18 +78,20 @@ component extends="mxunit.framework.TestCase" {
 
 	function testDirectDependency()  {
 		var payload = "this is so awesome!";
-		//var result = manager.directDependencies(artifactId="org.sonatype.aether:aether-util:1.9");
-		var result = manager.directDependencies("org.modeshape.bom:modeshape-bom-embedded:pom:4.0.0.Beta1");
+    var modeshapeVersion = "4.5.0.Final";
+		var result = manager.directDependencies("org.modeshape.bom:modeshape-bom-embedded:pom:#modeshapeVersion#");
+    assertTrue(arrayLen(result) == 0);
+    result = manager.directDependencies("org.apache.maven:maven-aether-provider:3.3.9");
+    assertTrue(arrayLen(result) > 5);
 		debug(result);
-		assertEquals(payload,result);
 	}
 
 	function testManagedDependency()  {
 		var payload = "this is so awesome!";
-		//var result = manager.directDependencies(artifactId="org.sonatype.aether:aether-util:1.9");
-		var result = manager.managedDependencies("org.modeshape.bom:modeshape-bom-embedded:pom:4.0.0.Beta1");
+		var modeshapeVersion = "4.5.0.Final";
+		var result = manager.managedDependencies("org.modeshape.bom:modeshape-bom-embedded:pom:#modeshapeVersion#");
 		debug(result);
-		assertEquals(payload,result);
+    assertTrue(arrayLen(result) > 5);
 	}
 
 	function testMaterializeManagedDependency()  {
@@ -114,20 +104,10 @@ component extends="mxunit.framework.TestCase" {
 	}
 
 	function testCollectDependency()  {
-		var payload = "this is so awesome!";
-		//var result = manager.collect(artifactId="org.apache.maven:maven-aether-provider:3.1.0");
-		var modeshapeVersion = "4.0.0.Beta1";
-		var result = manager.collect(artifactId="org.modeshape.bom:modeshape-bom-embedded:pom:#modeshapeVersion#", directory = workpath & "/libsman")
-
-		debug(result);
+		var result = manager.collect(artifactId="org.apache.maven:maven-aether-provider:3.3.9", directory = workpath & "/libsman")
+//		debug(result);
 		assertTrue(arrayLen(result) > 5);
 	}
 
-	function testDependencies()  {
-		var payload = "this is so awesome!";
-		var result = aether.callMethod("dependencies",{artifactId:"org.sonatype.aether:aether-util:1.9"});
-		debug(result);
-		assertEquals(payload,result);
-	}
 
 }
