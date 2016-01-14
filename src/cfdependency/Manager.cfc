@@ -239,14 +239,13 @@ component {
     if(uri.startsWith("file:")) {
       if(fileExists(uri)) {
         fileCopy(uri,toFile);
-      } else {
-        throw(message="no file #uri#");
+        logMessage("found in cfdistro artifacts: #uri#");
       }
     } else {
       http url=uri file=toFile result="httpResult";
       if(httpResult.status_code != 200) {
         fileDelete(toFile);
-        throw(message="#httpResult.statuscode# error for #uri#");
+        logMessage("#httpResult.statuscode# error for #uri#");
       }
     }
   }

@@ -393,7 +393,8 @@ component output="false" persistent="false" {
       return artifact & " resolved to  " & artifact.getFile();
   }
 
-  public function materialize(deps, directory, Boolean unzip = false, exclusions="") {
+  public function materialize(artifactId, directory, Boolean unzip = false, exclusions="") {
+    var deps = artifactId;
     var msession = getSession();
     var filter = jDependencyFilterUtils.classpathFilter( [jJavaScopes.COMPILE] );
     var collectRequest = jCollectRequest.init();
