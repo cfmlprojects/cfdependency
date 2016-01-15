@@ -348,7 +348,7 @@ component output="false" persistent="false" {
     for(var ver in rangeResult.getVersions()) {
       arrayAppend(versions,{version:ver.toString(),repository:rangeResult.getRepository(ver).toString(),resolved:resolved(artifactId & ":" & ver.toString())});
     }
-    return {min:versionMin,max:versionMax,versions:versions};
+    return {"min":versionMin,"max":versionMax,"versions":versions};
   }
 
   public function repositories() {
@@ -393,7 +393,7 @@ component output="false" persistent="false" {
       return artifact & " resolved to  " & artifact.getFile();
   }
 
-  public function materialize(artifactId, directory, Boolean unzip = false, exclusions="") {
+  public function materialize(required artifactId, directory, Boolean unzip = false, exclusions="") {
     var deps = artifactId;
     var msession = getSession();
     var filter = jDependencyFilterUtils.classpathFilter( [jJavaScopes.COMPILE] );

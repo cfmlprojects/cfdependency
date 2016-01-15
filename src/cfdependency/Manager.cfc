@@ -12,15 +12,20 @@ component {
         addRemoteRepository(repo.name,repo.url,repo.type);
       }
     }
-    rawMaterialize("org.cfmlprojects:cfaether:zip:#cfdependency.version#","#thisdir#/aether",true);
-    rawMaterialize("org.cfmlprojects:cfdependency:jar:#cfdependency.version#","#thisdir#/aether/lib");
-    rawMaterialize("cfml:javatools:zip:1.0.0","#thisdir#/javatools",true);
+//    rawMaterialize("org.cfmlprojects:cfaether:zip:#cfdependency.version#","#thisdir#aether",true);
+    rawMaterialize("org.cfmlprojects:cfdependency:jar:#cfdependency.version#","#thisdir#aether/lib");
+    rawMaterialize("cfml:javatools:zip:1.0.0","#thisdir#javatools",true);
     javaloader = new javatools.LibraryLoader(pathlist=thisdir & "/aether/lib/", id="aether-classloader")
     aether = new aether.Aether(localPath=localPath, javaloader=javaloader, repositories=repositories);
   }
 /*
  * AETHER
  **/
+
+  public function materialize(artifactId, directory, Boolean unzip = false) {
+    return aether.callMethod("materialize",arguments);
+  }
+
   public function resolve(artifactId) {
     return aether.callMethod("resolveArtifact",arguments);
   }
@@ -57,34 +62,29 @@ component {
     return aether.callMethod("pom",arguments);
   }
 
-  public function materialize(artifactId, directory, Boolean unzip = false) {
-    return aether.callMethod("materialize",arguments);
-  }
-
 /*
  * /AETHER
  **/
 
   public function rawMaterialize(artifact, directory, Boolean unzip = false) {
-    var files = rawResolve(artifact);
+    var files = simpleResolve(artifact);
     if(!directoryExists(directory)) {
-      try {
         directoryCreate(directory);
-        for(var file in files) {
-          if(unzip) {
-            zip action="unzip" file="#file#" destination="#directory#" overwrite=true;
-          } else {
-            fileCopy(file,directory);
-          }
+    }
+    try {
+      for(var file in files) {
+        if(unzip && zipContentDiffers(file,directory)) {
+          zip action="unzip" file="#file#" destination="#directory#" overwrite=true;
+        } else {
+          fileCopy(file,directory);
         }
-      } catch (any e) {
-        directoryDelete(directory,true);
-        rethrow(e);
       }
+    } catch (any e) {
+      throw(e);
     }
   }
 
-  public function rawResolve(artifact, Boolean dependencies = true, scope="runtime") {
+  public function simpleResolve(artifact, Boolean dependencies = true, scope="runtime") {
     var files = [];
     if(isArray(artifact)) {
       for(var afact in artifact) {
@@ -177,28 +177,6 @@ component {
     return artifactPath;
   }
 
-  private Boolean function hashMatch(filePath) {
-    if(fileExists("#filePath#.sha1") && fileExists(filePath)) {
-      var fileHash = lcase(hash(fileReadBinary(filePath),"sha1"));
-      var goodHash = lcase(fileRead(filePath & ".sha1"));
-      if( fileHash == goodHash) {
-        return true;
-      }
-    } else if(fileExists("#filePath#.md5") && fileExists(filePath)) {
-      var fileHash = lcase(hash(fileReadBinary(filePath),"md5"));
-      var goodHash = lcase(fileRead(filePath & ".md5"));
-      if( fileHash == goodHash) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private Boolean function hasValidHash(artifact) {
-    var filePath = getPathForLocalArtifact(artifact);
-    return hashMatch(filePath);
-  }
-
   private function getRemoteArtifact(artifact) {
     artifact = toArtifact(artifact);
     var filePath = getPathForArtifact(artifact);
@@ -229,7 +207,7 @@ component {
       }
     }
     if( !hashMatch(localPath)) {
-      request.debug(messages);
+//      request.debug(messages);
       throw(message="could not get #filePath# or hash incorrect");
     }
     return filePath;
@@ -248,6 +226,80 @@ component {
         logMessage("#httpResult.statuscode# error for #uri#");
       }
     }
+  }
+
+  private Boolean function hashMatch(filePath) {
+    if(fileExists("#filePath#.sha1") && fileExists(filePath)) {
+      var fileHash = lcase(hash(fileReadBinary(filePath),"sha1"));
+      var goodHash = lcase(fileRead(filePath & ".sha1"));
+      if( fileHash == goodHash) {
+        return true;
+      }
+    } else if(fileExists("#filePath#.md5") && fileExists(filePath)) {
+      var fileHash = lcase(hash(fileReadBinary(filePath),"md5"));
+      var goodHash = lcase(fileRead(filePath & ".md5"));
+      if( fileHash == goodHash) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private Boolean function hasValidHash(artifact) {
+    var filePath = getPathForLocalArtifact(artifact);
+    return hashMatch(filePath);
+  }
+
+  public function zipContentDiffers(zipfile,targetDirectory) {
+    var zf = createObject("java","java.util.zip.ZipFile").init(zipFile);
+    var e = zf.entries();
+    while (e.hasMoreElements()) {
+      var ze = e.nextElement();
+      if(!ze.isDirectory()) {
+        var crc = crc32(targetDirectory & "/#ze.getName()#");
+        if(ze.getCrc() != crc) {
+          return false;
+        }
+      }
+    }
+    zf.close();
+    return true;
+  }
+
+ function crc322(file) {
+    var input = fileReadBinary(file);
+    var bytes = input;
+    var java = {
+      CRC32 = createObject("java","java.util.zip.CRC32")
+    }
+    var checksum = java.CRC32.init();
+    checksum.reset();
+    checksum.update(bytes, 0, len(bytes));
+    var checksumValue = checksum.getValue();
+    return checksumValue;
+  }
+
+
+  public function crc32(file) {
+    var java = {
+      CRC32 = createObject("java","java.util.zip.CRC32")
+      ,BufferedInputStream = createObject("java","java.io.BufferedInputStream")
+      ,ByteArrayOutputStream = createObject("java","java.io.ByteArrayOutputStream")
+      ,ReflectArray = createObject("java","java.lang.reflect.Array")
+      ,FileInputStream = createObject("java","java.io.FileInputStream")
+      ,File = createObject("java","java.io.File")
+      ,Long = createObject("java","java.lang.Long")
+    }
+    var bis = java.BufferedInputStream.init(java.FileInputStream.init(java.File.init(arguments.file)));
+    var read = 0;
+    var checksum = java.CRC32.init();
+    var buffer = java.ByteArrayOutputStream.init().toByteArray().getClass().getComponentType();
+    buffer = java.ReflectArray.newInstance(buffer, 4096);
+    while ((read = bis.read(buffer)) != -1) {
+      checksum.update(buffer, 0, read);
+    }
+    bis.close();
+    return checksum.getValue();
   }
 
   public function logMessage(message){

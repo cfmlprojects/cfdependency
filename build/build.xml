@@ -33,7 +33,7 @@
     <pom-and-deploy pomid="cfml.pom" packaging="jar" artifact="${dist.dir}/aether-bundle.jar" groupId="org.cfmlprojects"
       artifactId="cfdependency" version="${cfdependecy.version}" name="cfdependency" />
 
-    <zip file="${dist.dir}/cfaether.zip">
+    <zip file="${dist.dir}/cfaether.zip" level="9">
       <fileset dir="${src.dir}/cfdependency/aether" />
     </zip>
     <pom-and-deploy pomid="aether.pom" packaging="zip" artifact="${dist.dir}/cfaether.zip" groupId="org.cfmlprojects"
